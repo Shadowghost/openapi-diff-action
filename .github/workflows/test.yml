@@ -1,0 +1,176 @@
+name: Test Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-no-changes:
+    name: Test - No Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (no changes)
+        id: diff
+        uses: ./
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v1.yaml'
+
+      - name: Verify no changes
+        run: |
+          if [[ "${{ steps.diff.outputs.state }}" != "no_changes" ]]; then
+            echo "Expected state 'no_changes', got '${{ steps.diff.outputs.state }}'"
+            exit 1
+          fi
+          if [[ "${{ steps.diff.outputs.has-changes }}" != "false" ]]; then
+            echo "Expected has-changes 'false', got '${{ steps.diff.outputs.has-changes }}'"
+            exit 1
+          fi
+          echo "Test passed: No changes detected correctly"
+
+  test-compatible-changes:
+    name: Test - Compatible Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (compatible changes)
+        id: diff
+        uses: ./
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v2-compatible.yaml'
+          markdown: 'diff-report.md'
+          artifact-name: 'test-compatible-report'
+
+      - name: Verify compatible changes
+        run: |
+          if [[ "${{ steps.diff.outputs.state }}" != "compatible" ]]; then
+            echo "Expected state 'compatible', got '${{ steps.diff.outputs.state }}'"
+            exit 1
+          fi
+          if [[ "${{ steps.diff.outputs.has-changes }}" != "true" ]]; then
+            echo "Expected has-changes 'true', got '${{ steps.diff.outputs.has-changes }}'"
+            exit 1
+          fi
+          if [[ "${{ steps.diff.outputs.is-breaking }}" != "false" ]]; then
+            echo "Expected is-breaking 'false', got '${{ steps.diff.outputs.is-breaking }}'"
+            exit 1
+          fi
+          echo "Test passed: Compatible changes detected correctly"
+
+      - name: Verify report file created
+        run: |
+          if [[ ! -f "diff-report.md" ]]; then
+            echo "Expected diff-report.md to exist"
+            exit 1
+          fi
+          echo "Report file created successfully"
+          cat diff-report.md
+
+  test-breaking-changes:
+    name: Test - Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (breaking changes)
+        id: diff
+        uses: ./
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v2-breaking.yaml'
+
+      - name: Verify breaking changes
+        run: |
+          if [[ "${{ steps.diff.outputs.state }}" != "incompatible" ]]; then
+            echo "Expected state 'incompatible', got '${{ steps.diff.outputs.state }}'"
+            exit 1
+          fi
+          if [[ "${{ steps.diff.outputs.is-breaking }}" != "true" ]]; then
+            echo "Expected is-breaking 'true', got '${{ steps.diff.outputs.is-breaking }}'"
+            exit 1
+          fi
+          echo "Test passed: Breaking changes detected correctly"
+
+  test-fail-on-breaking:
+    name: Test - Fail on Incompatible
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (should fail)
+        id: diff
+        uses: ./
+        continue-on-error: true
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v2-breaking.yaml'
+          fail-on-breaking: 'true'
+
+      - name: Verify action failed
+        run: |
+          if [[ "${{ steps.diff.outcome }}" != "failure" ]]; then
+            echo "Expected action to fail, but it succeeded"
+            exit 1
+          fi
+          echo "Test passed: Action correctly failed on breaking changes"
+
+  test-output-formats:
+    name: Test - Output Formats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (all formats)
+        id: diff
+        uses: ./
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v2-compatible.yaml'
+          html: 'reports/diff.html'
+          markdown: 'reports/diff.md'
+          json: 'reports/diff.json'
+          artifact-name: 'test-output-formats-report'
+
+      - name: Verify all report files created
+        run: |
+          for file in reports/diff.html reports/diff.md reports/diff.json; do
+            if [[ ! -f "$file" ]]; then
+              echo "Expected $file to exist"
+              exit 1
+            fi
+            echo "$file created successfully"
+          done
+          echo "All report files created - uploaded as 'openapi-diff-report' artifact"
+
+  test-no-artifact-on-no-changes:
+    name: Test - No Artifact When No Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OpenAPI Diff (no changes)
+        id: diff
+        uses: ./
+        with:
+          old-spec: 'test/specs/petstore-v1.yaml'
+          new-spec: 'test/specs/petstore-v1.yaml'
+          markdown: 'reports/diff.md'
+          artifact-name: 'test-no-changes-report'
+
+      - name: Verify state outputs
+        run: |
+          if [[ "${{ steps.diff.outputs.state }}" != "no_changes" ]]; then
+            echo "Expected state 'no_changes', got '${{ steps.diff.outputs.state }}'"
+            exit 1
+          fi
+          if [[ "${{ steps.diff.outputs.has-changes }}" != "false" ]]; then
+            echo "Expected has-changes 'false', got '${{ steps.diff.outputs.has-changes }}'"
+            exit 1
+          fi
+          echo "Test passed: No changes detected, artifact upload was skipped"

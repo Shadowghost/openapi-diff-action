@@ -1,0 +1,69 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Default preset for use with Jellyfin's repos",
+  "extends": [
+    "config:base",
+    ":disableDependencyDashboard",
+    ":enableVulnerabilityAlertsWithLabel(security)",
+    ":semanticCommitsDisabled",
+    ":timezone(Etc/UTC)",
+    "docker:enableMajor",
+    "group:testNonMajor",
+    "group:monorepos",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "addLabels": ["dependencies"],
+  "rebaseWhen": "conflicted",
+  "ignorePaths": ["**/node_modules/**", "**/bower_components/**"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "groupName": "lockfiles",
+    "schedule": [
+      "every month"
+    ]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["scripts/run-diff\\.sh$"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\nDOCKER_IMAGE=\"[^:]+:(?<currentValue>[\\d.]+)\""
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "openapi-diff Docker image updates",
+      "matchManagers": ["regex"],
+      "matchPackageNames": ["openapitools/openapi-diff"],
+      "addLabels": ["container"]
+    },
+    {
+      "description": "Add the container GitHub label to container image bump PRs",
+      "matchManagers": ["docker"],
+      "addLabels": ["container"]
+    },
+    {
+      "description": "Add the ci and github-actions GitHub label to GitHub Action bump PRs",
+      "matchManagers": ["github-actions"],
+      "addLabels": ["ci", "github-actions"]
+    },
+    {
+      "description": "Group GitHub Action bumps to one PR as long as they have no major jump",
+      "matchManagers": ["github-actions"],
+      "groupName": "CI dependencies",
+      "groupSlug": "ci-deps",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    },
+    {
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "groupName": "lockfiles",
+      "dependencyDashboardApproval": true
+    }
+  ]
+}

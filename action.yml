@@ -1,0 +1,144 @@
+name: 'OpenAPI Diff'
+description: 'Compare two OpenAPI specifications and detect breaking changes using openapitools/openapi-diff'
+author: 'OpenAPI Tools Community'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'blue'
+
+inputs:
+  old-spec:
+    description: 'Path or URL to the old/base OpenAPI specification'
+    required: true
+  new-spec:
+    description: 'Path or URL to the new/head OpenAPI specification'
+    required: true
+  html:
+    description: 'Path to write HTML diff report'
+    required: false
+    default: ''
+  markdown:
+    description: 'Path to write Markdown diff report'
+    required: false
+    default: ''
+  json:
+    description: 'Path to write JSON diff report'
+    required: false
+    default: ''
+  asciidoc:
+    description: 'Path to write Asciidoc diff report'
+    required: false
+    default: ''
+  text:
+    description: 'Path to write plain text diff report'
+    required: false
+    default: ''
+  fail-on-breaking:
+    description: 'Fail the action if breaking changes are detected'
+    required: false
+    default: 'false'
+  fail-on-changed:
+    description: 'Fail the action if any changes are detected (breaking or compatible)'
+    required: false
+    default: 'false'
+  headers:
+    description: 'HTTP headers to use when fetching remote specs via URL (format: "Header1=Value1,Header2=Value2"). Only applies to URL specs, ignored for local files.'
+    required: false
+    default: ''
+  log-level:
+    description: 'Log level (TRACE, DEBUG, INFO, WARN, ERROR, OFF)'
+    required: false
+    default: 'ERROR'
+  add-pr-comment:
+    description: 'Add diff results as a PR comment'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for posting PR comments (required if add-pr-comment is true)'
+    required: false
+    default: ''
+  artifact-name:
+    description: 'Name for the uploaded artifact containing report files'
+    required: false
+    default: 'openapi-diff-report'
+
+outputs:
+  state:
+    description: 'Diff state: no_changes, compatible, or incompatible'
+    value: ${{ steps.diff.outputs.state }}
+  has-changes:
+    description: 'Whether any changes were detected (true/false)'
+    value: ${{ steps.diff.outputs.has_changes }}
+  is-breaking:
+    description: 'Whether breaking changes were detected (true/false)'
+    value: ${{ steps.diff.outputs.is_breaking }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run OpenAPI Diff
+      id: diff
+      shell: bash
+      env:
+        INPUT_OLD_SPEC: ${{ inputs.old-spec }}
+        INPUT_NEW_SPEC: ${{ inputs.new-spec }}
+        INPUT_HTML: ${{ inputs.html }}
+        INPUT_MARKDOWN: ${{ inputs.markdown }}
+        INPUT_JSON: ${{ inputs.json }}
+        INPUT_ASCIIDOC: ${{ inputs.asciidoc }}
+        INPUT_TEXT: ${{ inputs.text }}
+        INPUT_FAIL_ON_BREAKING: ${{ inputs.fail-on-breaking }}
+        INPUT_FAIL_ON_CHANGED: ${{ inputs.fail-on-changed }}
+        INPUT_HEADERS: ${{ inputs.headers }}
+        INPUT_LOG_LEVEL: ${{ inputs.log-level }}
+      run: ${{ github.action_path }}/scripts/run-diff.sh
+
+    - name: Get PR number
+      if: ${{ fromJSON(inputs.add-pr-comment) }}
+      id: pr-number
+      shell: bash
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
+          echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+        elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+          echo "number=${{ github.event.workflow_run.pull_requests[0].number }}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Find existing PR comment
+      if: ${{ fromJSON(inputs.add-pr-comment) && steps.pr-number.outputs.number != '' }}
+      id: find-comment
+      uses: peter-evans/find-comment@v3
+      with:
+        token: ${{ inputs.github-token }}
+        issue-number: ${{ steps.pr-number.outputs.number }}
+        body-includes: '<!--openapi-diff-workflow-comment-->'
+
+    - name: Create PR Comment
+      if: ${{ fromJSON(inputs.add-pr-comment) && steps.pr-number.outputs.number != '' && steps.find-comment.outputs.comment-id == '' }}
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        token: ${{ inputs.github-token }}
+        issue-number: ${{ steps.pr-number.outputs.number }}
+        body-path: ${{ steps.diff.outputs.pr_comment_file }}
+
+    - name: Update PR Comment
+      if: ${{ fromJSON(inputs.add-pr-comment) && steps.pr-number.outputs.number != '' && steps.find-comment.outputs.comment-id != '' }}
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        token: ${{ inputs.github-token }}
+        comment-id: ${{ steps.find-comment.outputs.comment-id }}
+        edit-mode: replace
+        body-path: ${{ steps.diff.outputs.pr_comment_file }}
+
+    - name: Upload report artifacts
+      if: ${{ steps.diff.outputs.has_changes == 'true' && (inputs.markdown != '' || inputs.json != '' || inputs.html != '' || inputs.text != '' || inputs.asciidoc != '') }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        if-no-files-found: ignore
+        path: |
+          ${{ inputs.markdown }}
+          ${{ inputs.json }}
+          ${{ inputs.html }}
+          ${{ inputs.text }}
+          ${{ inputs.asciidoc }}
