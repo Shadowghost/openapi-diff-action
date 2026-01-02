@@ -27,15 +27,15 @@
       "customType": "regex",
       "fileMatch": ["scripts/run-diff\\.sh$"],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\nDOCKER_IMAGE=\"[^:]+:(?<currentValue>[\\d.]+)\""
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\n[A-Z_]+=\"[^:]+:(?<currentValue>v?[\\d.]+)\""
       ]
     }
   ],
   "packageRules": [
     {
-      "description": "openapi-diff Docker image updates",
+      "description": "Docker image updates from shell scripts",
       "matchManagers": ["regex"],
-      "matchPackageNames": ["openapitools/openapi-diff"],
+      "matchPackageNames": ["openapitools/openapi-diff", "tufin/oasdiff"],
       "addLabels": ["container"]
     },
     {
