@@ -115,7 +115,7 @@ runs:
 
     - name: Create PR Comment
       if: ${{ fromJSON(inputs.add-pr-comment) && steps.pr-number.outputs.number != '' && steps.find-comment.outputs.comment-id == '' }}
-      uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
       with:
         token: ${{ inputs.github-token }}
         issue-number: ${{ steps.pr-number.outputs.number }}
@@ -123,7 +123,7 @@ runs:
 
     - name: Update PR Comment
       if: ${{ fromJSON(inputs.add-pr-comment) && steps.pr-number.outputs.number != '' && steps.find-comment.outputs.comment-id != '' }}
-      uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
       with:
         token: ${{ inputs.github-token }}
         comment-id: ${{ steps.find-comment.outputs.comment-id }}
