@@ -38,6 +38,7 @@ A GitHub Action to compare two OpenAPI specifications and detect breaking change
 | `fail-on-changed` | No | `false` | Fail if any changes detected |
 | `headers` | No | - | HTTP headers for fetching remote URL specs (format: `Header=Value,Header2=Value2`) |
 | `log-level` | No | `ERROR` | Log level (TRACE, DEBUG, INFO, WARN, ERROR, OFF) |
+| `circular-ref-mode` | No | `replace-allof` | Circular reference handling: `replace-allof` or `flatten` |
 | `add-pr-comment` | No | `false` | Post results as PR comment (updates existing comment if present) |
 | `github-token` | No | - | Token for PR comments (required if `add-pr-comment` is true) |
 | `artifact-name` | No | `openapi-diff-report` | Name for the uploaded artifact containing report files |
@@ -222,7 +223,16 @@ If using the action multiple times in the same workflow, specify unique artifact
 
 ### Circular Reference Handling
 
-This action automatically flattens OpenAPI specifications using [oasdiff](https://github.com/oasdiff/oasdiff) before comparison. This resolves circular `$ref` references that would otherwise cause `StackOverflowError` in the underlying openapi-diff tool (see [issue #124](https://github.com/OpenAPITools/openapi-diff/issues/124)).
+Specs with circular `$ref` cause `StackOverflowError` in openapi-diff ([issue #124](https://github.com/OpenAPITools/openapi-diff/issues/124)). This action provides two handling modes:
+
+**`replace-allof` (default)**: Replaces `"allOf"` with `"oneOf"` using sed. Works around the bug since openapi-diff handles `oneOf` circular refs correctly but not `allOf`.
+
+**`flatten`**: Uses `oasdiff flatten`.
+
+Example using flatten mode:
+```yaml
+circular-ref-mode: 'flatten'
+```
 
 ### Output Format
 
