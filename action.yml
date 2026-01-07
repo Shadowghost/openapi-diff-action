@@ -49,6 +49,10 @@ inputs:
     description: 'Log level (TRACE, DEBUG, INFO, WARN, ERROR, OFF)'
     required: false
     default: 'ERROR'
+  circular-ref-mode:
+    description: 'How to handle circular references: "replace-allof" (sed-based, deterministic, default) or "flatten" (oasdiff-based, may be non-deterministic)'
+    required: false
+    default: 'replace-allof'
   add-pr-comment:
     description: 'Add diff results as a PR comment'
     required: false
@@ -91,6 +95,7 @@ runs:
         INPUT_FAIL_ON_CHANGED: ${{ inputs.fail-on-changed }}
         INPUT_HEADERS: ${{ inputs.headers }}
         INPUT_LOG_LEVEL: ${{ inputs.log-level }}
+        INPUT_CIRCULAR_REF_MODE: ${{ inputs.circular-ref-mode }}
       run: ${{ github.action_path }}/scripts/run-diff.sh
 
     - name: Get PR number

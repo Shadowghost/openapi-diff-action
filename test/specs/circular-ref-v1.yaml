@@ -1,0 +1,36 @@
+openapi: 3.0.0
+info:
+  title: Circular Reference Test API
+  version: 1.0.0
+
+paths:
+  /items:
+    get:
+      summary: Get items
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BaseItem'
+
+components:
+  schemas:
+    BaseItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        parent:
+          allOf:
+            - $ref: '#/components/schemas/BaseItem'
+          nullable: true
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseItem'

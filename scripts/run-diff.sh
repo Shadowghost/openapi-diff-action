@@ -16,8 +16,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Flatten spec using oasdiff to resolve circular references
-# See: https://github.com/OpenAPITools/openapi-diff/issues/124
+# Replace allOf with oneOf to avoid StackOverflowError on circular refs
+# https://github.com/OpenAPITools/openapi-diff/issues/124
+replace_allof() {
+    local spec="$1"
+    local name="$2"
+    
+    if [[ "$spec" == http://* ]] || [[ "$spec" == https://* ]]; then
+        curl -sL "$spec" | sed -e 's/"allOf"/"oneOf"/g' -e 's/allOf:/oneOf:/g' > "${SPECS_DIR}/${name}"
+    else
+        sed -e 's/"allOf"/"oneOf"/g' -e 's/allOf:/oneOf:/g' "${WORKSPACE_DIR}/${spec}" > "${SPECS_DIR}/${name}"
+    fi
+    
+    echo "/specs/${name}"
+}
+
+# Flatten with oasdiff (may be non-deterministic)
 flatten_spec() {
     local spec="$1"
     local name="$2"
@@ -30,6 +44,16 @@ flatten_spec() {
     fi
 
     echo "/specs/${name}"
+}
+
+process_spec() {
+    local spec="$1"
+    local name="$2"
+    
+    case "${INPUT_CIRCULAR_REF_MODE:-replace-allof}" in
+        flatten) flatten_spec "$spec" "$name" ;;
+        *) replace_allof "$spec" "$name" ;;
+    esac
 }
 
 echo "::group::OpenAPI Diff Configuration"
@@ -45,10 +69,11 @@ DOCKER_ARGS+=(-v "${WORKSPACE_DIR}:/workspace:ro")
 DOCKER_ARGS+=(-v "${SPECS_DIR}:/specs:ro")
 DOCKER_ARGS+=(-v "${TEMP_DIR}:/output:rw")
 
-# Flatten spec files to resolve circular references that cause StackOverflowError
-echo "::group::Flattening OpenAPI specs"
-OLD_SPEC=$(flatten_spec "${INPUT_OLD_SPEC}" "old-spec.json")
-NEW_SPEC=$(flatten_spec "${INPUT_NEW_SPEC}" "new-spec.json")
+# Process specs to handle circular references
+MODE="${INPUT_CIRCULAR_REF_MODE:-replace-allof}"
+echo "::group::Processing specs (mode: ${MODE})"
+OLD_SPEC=$(process_spec "${INPUT_OLD_SPEC}" "old-spec.json")
+NEW_SPEC=$(process_spec "${INPUT_NEW_SPEC}" "new-spec.json")
 echo "::endgroup::"
 
 # Build openapi-diff arguments
